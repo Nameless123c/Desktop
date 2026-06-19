@@ -33,6 +33,7 @@ module.exports = () => {
                 })
                 return res.status(200).json({
                     status: 1, data: {
+                        userId: user._id,
                         token: token,
                         Username: Username,
                         FullName: FullName,
@@ -67,6 +68,7 @@ module.exports = () => {
                     })
                     return res.status(200).json({
                         status: 1, data: {
+                            userId: info._id, 
                             token: token,
                             Username: info?.Username,
                             FullName: info?.FullName,

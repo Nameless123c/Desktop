@@ -6,6 +6,7 @@
 #include "ChangeFormat.h"
 #include "FileService.h"
 #include "PaintService.h"
+#include "DatabaseService.h"
 
 IMPLEMENT_DYNAMIC(CChatFriendDlg, CDialogEx)
 
@@ -15,6 +16,7 @@ BEGIN_MESSAGE_MAP(CChatFriendDlg, CDialogEx)
 	ON_WM_LBUTTONDOWN()
 	ON_WM_TIMER()
 	ON_WM_CTLCOLOR()
+	ON_STN_CLICKED(IDC_STATIC_CHATFRIEND_FULLNAME, &CChatFriendDlg::OnStnClickedStaticChatfriendFullname)
 END_MESSAGE_MAP()
 
 CChatFriendDlg::CChatFriendDlg(CWnd* pParent /*=nullptr*/)
@@ -74,7 +76,7 @@ BOOL CChatFriendDlg::OnInitDialog() {
 		pEdit->SetCueBanner(_T("Nhập tin nhắn..."));
 	}
 
-	m_fontTitle.CreateFont(50, 0, 0, 0, 0, FALSE, FALSE, 0,
+	m_fontTitle.CreateFont(20, 0, 0, 0, 0, FALSE, FALSE, 0,
 		ANSI_CHARSET, OUT_DEFAULT_PRECIS, CLIP_DEFAULT_PRECIS,
 		DEFAULT_QUALITY, DEFAULT_PITCH | FF_SWISS, _T("Segoe UI Semibold"));
 
@@ -121,6 +123,8 @@ void CChatFriendDlg::GetMessage() {
 
 		if (!bDataChanged && !m_bIsFirstLoad) return;
 
+		DatabaseService::ExecuteSQL("BEGIN TRANSACTION;");
+
 		// 3. Clear và nạp tin nhắn mới vào vector riêng
 		m_vecLocalMessages.clear();
 		for (auto& item : jsonRes["data"]) {
@@ -143,8 +147,11 @@ void CChatFriendDlg::GetMessage() {
 					msg.files.push_back(file);
 				}
 			}
+			DatabaseService::SaveMessageToDB(msg, m_currentFriend.friendId);
 			m_vecLocalMessages.push_back(msg);
 		}
+
+		DatabaseService::ExecuteSQL("COMMIT;");
 
 		// 4. Tính toán chiều cao dựa trên m_vecLocalMessages
 		CClientDC dc(this);
@@ -330,4 +337,18 @@ HBRUSH CChatFriendDlg::OnCtlColor(CDC* pDC, CWnd* pWnd, UINT nCtlColor) {
 	}
 
 	return hbr;
+}
+
+void CChatFriendDlg::OnStnClickedStaticChatfriendFullname()
+{
+	if (!m_isFriendDlgCreated) {
+		if (m_friendDlg.Create(IDD_FRIEND_DIALOG, this)) {
+			m_isFriendDlgCreated = TRUE;
+		}
+	}
+
+	m_friendDlg.m_friendData = this->m_currentFriend;
+
+	m_friendDlg.ShowWindow(SW_SHOW);
+	m_friendDlg.BringWindowToTop();
 }

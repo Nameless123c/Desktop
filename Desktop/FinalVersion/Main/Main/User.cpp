@@ -5,6 +5,7 @@ User::User() :
     username(""),
     fullName(""),
     password(""),
+    userId(""),
     avatar("avatar/default.jpg")
 {
 }

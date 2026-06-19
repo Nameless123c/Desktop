@@ -35,7 +35,7 @@ BOOL CSignupDlg::OnInitDialog() {
 
 	SetBackgroundColor(RGB(255, 255, 255));
 
-	m_fontTitle.CreateFont(50, 0, 0, 0, 0, FALSE, FALSE, 0,
+	m_fontTitle.CreateFont(20, 0, 0, 0, 0, FALSE, FALSE, 0,
 		ANSI_CHARSET, OUT_DEFAULT_PRECIS, CLIP_DEFAULT_PRECIS,
 		DEFAULT_QUALITY, DEFAULT_PITCH | FF_SWISS, _T("Segoe UI Semibold"));
 
@@ -97,15 +97,20 @@ void CSignupDlg::OnBnClickedButtonSignupSubmit(){
 		} 
 		else {
 			nlohmann::json jsonRes = nlohmann::json::parse(res);
+			std::string strUserId = jsonRes["userId"];
 
 			if (jsonRes["status"] == 1) {
 
-				std::string sql = "INSERT INTO Users (username, fullName, password) VALUES (?, ?, ?);";
+				// lưu db
+				std::string sql = "INSERT INTO Users (userId, username, fullName, password) VALUES (?, ?, ?, ?);";
 				sqlite3_stmt* stmt;
+
 				if (sqlite3_prepare_v2(DatabaseService::m_db, sql.c_str(), -1, &stmt, nullptr) == SQLITE_OK) {
-					sqlite3_bind_text(stmt, 1, strFullName.c_str(), -1, SQLITE_TRANSIENT);
-					sqlite3_bind_text(stmt, 2, strUsername.c_str(), -1, SQLITE_TRANSIENT);
-					sqlite3_bind_text(stmt, 3, strPassword.c_str(), -1, SQLITE_TRANSIENT);
+					// 2. Gán giá trị theo thứ tự (userId là index 1)
+					sqlite3_bind_text(stmt, 1, strUserId.c_str(), -1, SQLITE_TRANSIENT);   // userId (lấy từ JSON response)
+					sqlite3_bind_text(stmt, 2, strUsername.c_str(), -1, SQLITE_TRANSIENT); // username
+					sqlite3_bind_text(stmt, 3, strFullName.c_str(), -1, SQLITE_TRANSIENT); // fullName
+					sqlite3_bind_text(stmt, 4, strPassword.c_str(), -1, SQLITE_TRANSIENT); // password
 
 					sqlite3_step(stmt);
 					sqlite3_finalize(stmt);

@@ -4,6 +4,7 @@
 #include <vector>
 #include "Message.h"
 #include "Friend.h"
+#include "CFriendDlg.h"
 
 
 class CChatFriendDlg : public CDialogEx{
@@ -47,10 +48,13 @@ public:
 	CFont m_fontTitle;
 	std::vector<Message> m_vecLocalMessages;
 	Friend m_currentFriend;
+	CFriendDlg m_friendDlg;
+	BOOL m_isFriendDlgCreated = FALSE;
 	
 	virtual BOOL OnInitDialog();
 	afx_msg void OnPaint();
 	afx_msg BOOL OnMouseWheel(UINT nFlags, short zDelta, CPoint pt);
 	afx_msg void OnLButtonDown(UINT nFlags, CPoint point);
 	afx_msg HBRUSH OnCtlColor(CDC* pDC, CWnd* pWnd, UINT nCtlColor);
+	afx_msg void OnStnClickedStaticChatfriendFullname();
 };

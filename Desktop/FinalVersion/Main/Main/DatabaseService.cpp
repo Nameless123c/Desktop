@@ -1,6 +1,10 @@
 #include "pch.h" 
 #include "DatabaseService.h"
 #include <iostream>
+#include "Friend.h"
+#include <vector>
+#include "Main.h"
+#include "Message.h"
 
 sqlite3* DatabaseService::m_db = nullptr;
 
@@ -32,43 +36,138 @@ bool DatabaseService::ExecuteSQL(const std::string& sql) {
 void DatabaseService::InitializeSchema() {
     ExecuteSQL("PRAGMA foreign_keys = ON;");
 
-    // 1. Bảng Users: Thêm DEFAULT 'avatar/default.jpg'
+    // 1. Bảng Users (ID lấy từ Server)
     ExecuteSQL("CREATE TABLE IF NOT EXISTS Users ("
-        "userId INTEGER PRIMARY KEY AUTOINCREMENT, "
+        "userId TEXT PRIMARY KEY, " 
         "username TEXT UNIQUE, "
         "fullName TEXT, "
         "password TEXT, "
         "avatar TEXT DEFAULT 'avatar/default.jpg');");
 
-    // 2. Bảng Friends: Thêm DEFAULT 'avatar/default.jpg'
+    // 2. Bảng Friends (ID lấy từ Server)
     ExecuteSQL("CREATE TABLE IF NOT EXISTS Friends ("
-        "friendId INTEGER PRIMARY KEY AUTOINCREMENT, "
-        "userId INTEGER, "
+        "friendId TEXT PRIMARY KEY, " 
+        "userId TEXT, "              
         "fullName TEXT, "
         "avatar TEXT DEFAULT 'avatar/default.jpg', "
         "isOnline INTEGER DEFAULT 0, "
         "FOREIGN KEY(userId) REFERENCES Users(userId));");
+        
+    // 3. Bảng FriendSettings (Lưu biệt danh)
+    ExecuteSQL("CREATE TABLE IF NOT EXISTS FriendSettings ("
+        "ownerId TEXT, "             // Người đặt biệt danh (User hiện tại)
+        "friendId TEXT, "            
+        "nickname TEXT, "
+        "PRIMARY KEY(ownerId, friendId), " 
+        "FOREIGN KEY(ownerId) REFERENCES Users(userId), "
+        "FOREIGN KEY(friendId) REFERENCES Friends(friendId));");
 
-    // 3. Bảng Messages
+    // 4. Bảng Messages (ID lấy từ Server)
     ExecuteSQL("CREATE TABLE IF NOT EXISTS Messages ("
-        "messageId INTEGER PRIMARY KEY AUTOINCREMENT, "
-        "senderId INTEGER, "
+        "messageId TEXT PRIMARY KEY, "
+        "senderId TEXT, "
         "content TEXT, "
         "createdAt TEXT, "
+        "messageType INTEGER, " // Thêm dòng này
+        "isSend INTEGER, "      // Thêm dòng này
         "FOREIGN KEY(senderId) REFERENCES Users(userId));");
 
-    // 4. Bảng Images
+    // 5. Bảng Images
     ExecuteSQL("CREATE TABLE IF NOT EXISTS Images ("
-        "imageId INTEGER PRIMARY KEY AUTOINCREMENT, "
-        "messageId INTEGER, "
+        "imageId TEXT PRIMARY KEY, "
+        "messageId TEXT, "
         "url TEXT, "
         "FOREIGN KEY(messageId) REFERENCES Messages(messageId) ON DELETE CASCADE);");
 
-    // 5. Bảng Files
+    // 6. Bảng Files
     ExecuteSQL("CREATE TABLE IF NOT EXISTS Files ("
-        "fileId INTEGER PRIMARY KEY AUTOINCREMENT, "
-        "messageId INTEGER, "
+        "fileId TEXT PRIMARY KEY, "
+        "messageId TEXT, "
         "url TEXT, "
         "fileName TEXT, "
         "FOREIGN KEY(messageId) REFERENCES Messages(messageId) ON DELETE CASCADE);");
+}
+
+void DatabaseService::SyncFriendsToDB(const std::vector<Friend>& friends) {
+    // Dùng transaction để tăng tốc độ ghi (nếu không, mỗi lần INSERT sẽ mất thời gian tạo index)
+    ExecuteSQL("BEGIN TRANSACTION;");
+
+    std::string sql = "INSERT OR REPLACE INTO Friends (friendId, userId, fullName, avatar, isOnline) VALUES (?, ?, ?, ?, ?);";
+    sqlite3_stmt* stmt;
+
+    if (sqlite3_prepare_v2(DatabaseService::m_db, sql.c_str(), -1, &stmt, nullptr) == SQLITE_OK) {
+        for (const auto& f : friends) {
+            sqlite3_bind_text(stmt, 1, f.friendId.c_str(), -1, SQLITE_TRANSIENT);
+            sqlite3_bind_text(stmt, 2, theApp.m_userData.userId.c_str(), -1, SQLITE_TRANSIENT); // userId của chủ sở hữu
+            sqlite3_bind_text(stmt, 3, f.fullName.c_str(), -1, SQLITE_TRANSIENT);
+            sqlite3_bind_text(stmt, 4, f.avatar.c_str(), -1, SQLITE_TRANSIENT);
+            sqlite3_bind_int(stmt, 5, f.isOnline);
+
+            sqlite3_step(stmt);
+            sqlite3_reset(stmt); // Reset để tái sử dụng câu lệnh đã prepare
+        }
+        sqlite3_finalize(stmt);
+    }
+    ExecuteSQL("COMMIT;");
+}
+
+
+void DatabaseService::SaveMessageToDB(const Message& msg, const std::string& senderId) {
+    // 1. Dùng Transaction để đảm bảo tính toàn vẹn (Atomicity)
+    ExecuteSQL("BEGIN TRANSACTION;");
+
+    // 2. Lưu tin nhắn chính vào bảng Messages
+    // Cột: messageId, senderId, content, createdAt, messageType, isSend
+    std::string sqlMsg = "INSERT OR REPLACE INTO Messages (messageId, senderId, content, createdAt, messageType, isSend) VALUES (?, ?, ?, ?, ?, ?);";
+    sqlite3_stmt* stmtMsg;
+
+    if (sqlite3_prepare_v2(m_db, sqlMsg.c_str(), -1, &stmtMsg, nullptr) == SQLITE_OK) {
+        sqlite3_bind_text(stmtMsg, 1, msg.id.c_str(), -1, SQLITE_TRANSIENT);
+        sqlite3_bind_text(stmtMsg, 2, senderId.c_str(), -1, SQLITE_TRANSIENT);
+        sqlite3_bind_text(stmtMsg, 3, msg.content.c_str(), -1, SQLITE_TRANSIENT);
+        sqlite3_bind_text(stmtMsg, 4, msg.createdAt.c_str(), -1, SQLITE_TRANSIENT);
+        sqlite3_bind_int(stmtMsg, 5, msg.messageType);
+        sqlite3_bind_int(stmtMsg, 6, msg.isSend);
+
+        sqlite3_step(stmtMsg);
+        sqlite3_finalize(stmtMsg);
+    }
+
+    // 3. Lưu danh sách ảnh vào bảng Images
+    if (!msg.images.empty()) {
+        std::string sqlImg = "INSERT OR REPLACE INTO Images (imageId, messageId, url) VALUES (?, ?, ?);";
+        sqlite3_stmt* stmtImg;
+        if (sqlite3_prepare_v2(m_db, sqlImg.c_str(), -1, &stmtImg, nullptr) == SQLITE_OK) {
+            for (const auto& img : msg.images) {
+                sqlite3_bind_text(stmtImg, 1, img.id.c_str(), -1, SQLITE_TRANSIENT);
+                sqlite3_bind_text(stmtImg, 2, msg.id.c_str(), -1, SQLITE_TRANSIENT);
+                sqlite3_bind_text(stmtImg, 3, img.url.c_str(), -1, SQLITE_TRANSIENT);
+
+                sqlite3_step(stmtImg);
+                sqlite3_reset(stmtImg); // Reset statement để bind cho ảnh tiếp theo
+            }
+            sqlite3_finalize(stmtImg);
+        }
+    }
+
+    // 4. Lưu danh sách tệp đính kèm vào bảng Files
+    if (!msg.files.empty()) {
+        std::string sqlFile = "INSERT OR REPLACE INTO Files (fileId, messageId, url, fileName) VALUES (?, ?, ?, ?);";
+        sqlite3_stmt* stmtFile;
+        if (sqlite3_prepare_v2(m_db, sqlFile.c_str(), -1, &stmtFile, nullptr) == SQLITE_OK) {
+            for (const auto& file : msg.files) {
+                sqlite3_bind_text(stmtFile, 1, file.id.c_str(), -1, SQLITE_TRANSIENT);
+                sqlite3_bind_text(stmtFile, 2, msg.id.c_str(), -1, SQLITE_TRANSIENT);
+                sqlite3_bind_text(stmtFile, 3, file.url.c_str(), -1, SQLITE_TRANSIENT);
+                sqlite3_bind_text(stmtFile, 4, file.fileName.c_str(), -1, SQLITE_TRANSIENT);
+
+                sqlite3_step(stmtFile);
+                sqlite3_reset(stmtFile); // Reset statement để bind cho file tiếp theo
+            }
+            sqlite3_finalize(stmtFile);
+        }
+    }
+
+    // 5. Hoàn tất giao dịch
+    ExecuteSQL("COMMIT;");
 }

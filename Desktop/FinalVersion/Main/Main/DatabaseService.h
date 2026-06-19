@@ -1,6 +1,9 @@
 #pragma once
 #include "sqlite3.h"
 #include <string>
+#include "Friend.h"
+#include <vector>
+#include "Message.h"
 
 class DatabaseService {
 public:
@@ -8,9 +11,11 @@ public:
 
     static void CloseDB();
 
-    static bool ExecuteSQL(const std::string& sql);
+    static bool ExecuteSQL(const std::string& sql); 
 
     static void InitializeSchema();
 
     static sqlite3* m_db;
+    static void SyncFriendsToDB(const std::vector<Friend>& friends);
+    static void SaveMessageToDB(const Message& msg, const std::string& senderId);
 };

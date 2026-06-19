@@ -6,6 +6,7 @@
 #include "Friend.h"
 #include "FileService.h"
 #include "PaintService.h"
+#include "DatabaseService.h"
 
 
 IMPLEMENT_DYNAMIC(CHomeChatDlg, CDialogEx)
@@ -16,6 +17,7 @@ BEGIN_MESSAGE_MAP(CHomeChatDlg, CDialogEx)
     ON_WM_LBUTTONDOWN()
     ON_EN_CHANGE(IDC_EDIT_HOMECHAT_SEARCH, &CHomeChatDlg::OnChangeEditHomechatSearch)
     ON_WM_CTLCOLOR()
+    ON_WM_TIMER()
 END_MESSAGE_MAP()
 
 CHomeChatDlg::CHomeChatDlg(CWnd* pParent /*=nullptr*/)
@@ -57,6 +59,8 @@ BOOL CHomeChatDlg::OnInitDialog()
     if (pTitle) {
         pTitle->SetFont(&m_fontTitle);
     }
+
+    SetTimer(2, 10000, NULL);
 
     return TRUE;
 }
@@ -109,7 +113,9 @@ void CHomeChatDlg::GetFiendList()
                 if (item.contains("Avatar")) f.avatar = item["Avatar"];
                 f.pAvatar = FileService::LoadImageFromFile(f.avatar);
                 theApp.m_vecFriend.push_back(f);
+                DatabaseService::SyncFriendsToDB(theApp.m_vecFriend);
             }
+            DatabaseService::SyncFriendsToDB(theApp.m_vecFriend);
         }
     }
 }
@@ -125,6 +131,17 @@ void CHomeChatDlg::GetUserData()
         if (jsonRes["status"] == 1) {
             if (jsonRes["data"].contains("Avatar")) theApp.m_userData.avatar = jsonRes["data"]["Avatar"];
             theApp.m_userData.pAvatar = FileService::LoadImageFromFile(theApp.m_userData.avatar);
+
+            std::string sqlUpdate = "UPDATE Users SET avatar = ? WHERE userId = ?;";
+            sqlite3_stmt* stmt;
+
+            if (sqlite3_prepare_v2(DatabaseService::m_db, sqlUpdate.c_str(), -1, &stmt, nullptr) == SQLITE_OK) {
+                sqlite3_bind_text(stmt, 1, theApp.m_userData.avatar.c_str(), -1, SQLITE_TRANSIENT);
+                sqlite3_bind_text(stmt, 2, theApp.m_userData.userId.c_str(), -1, SQLITE_TRANSIENT);
+
+                sqlite3_step(stmt);
+                sqlite3_finalize(stmt);
+            }
         }
     }
 }
@@ -262,4 +279,14 @@ HBRUSH CHomeChatDlg::OnCtlColor(CDC* pDC, CWnd* pWnd, UINT nCtlColor){
     }
 
     return hbr;
+}
+
+void CHomeChatDlg::OnTimer(UINT_PTR nIDEvent) {
+    if (nIDEvent == 2) {
+        theApp.m_vecFriend.clear();
+        GetFiendList();
+        m_vecFriendDisplay = theApp.m_vecFriend;
+        InvalidateRect(&m_rectFriendArea, TRUE);
+    }
+    CDialogEx::OnTimer(nIDEvent);
 }
