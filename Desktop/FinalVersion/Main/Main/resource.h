@@ -2,8 +2,6 @@
 // Microsoft Visual C++ generated include file.
 // Used by Main.rc
 //
-#define WM_USER_LOGOUT_SIGNAL (WM_USER + 200)
-
 #define IDM_ABOUTBOX                    0x0010
 #define IDD_LOGIN_DIALOG                102
 #define IDD_SIGNUP_DIALOG               103
@@ -67,11 +65,13 @@
 #define IDC_STATIC_USER_EXIT            1053
 #define IDC_STATIC_USER_TITLE           1054
 #define IDC_STATIC_USER_APPBAR          1055
+#define IDC_STATIC_USER_ERROR           1056
 #define ID_LOGIN_TRIGGER                1101
 #define ID_SIGNUP_TRIGGER               1102
 #define ID_HOMECHAT_TRIGGER             1103
 #define ID_CHATFRIEND_TRIGGER           1104
 #define ID_EXIT_TRIGGER                 1105
+#define WM_USER_LOGOUT_SIGNAL (WM_USER + 200)
 
 // Next default values for new objects
 // 
@@ -79,7 +79,8 @@
 #ifndef APSTUDIO_READONLY_SYMBOLS
 #define _APS_NEXT_RESOURCE_VALUE        140
 #define _APS_NEXT_COMMAND_VALUE         32771
-#define _APS_NEXT_CONTROL_VALUE         1056
+#define _APS_NEXT_CONTROL_VALUE         1057
 #define _APS_NEXT_SYMED_VALUE           101
 #endif
 #endif
+

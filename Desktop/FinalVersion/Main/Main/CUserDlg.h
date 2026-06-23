@@ -29,4 +29,5 @@ public:
 	void OnClose();
 
 	CFont m_fontTitle;
+	afx_msg void OnStnClickedStaticUserChangeavt();
 };

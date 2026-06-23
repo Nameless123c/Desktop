@@ -21,7 +21,12 @@ module.exports = () => {
             if (user == null) {
                 return res.status(400).json({ status: 0, data: null, message: 'User not found' })
             }
+
             let avatar = null
+            if (!fs.existsSync(savePathImageAvatar)) {
+                fs.mkdirSync(savePathImageAvatar, { recursive: true });
+            }
+
             for (const file of req.files) {
                 if (file.fieldname === 'avatar') {
                     const extension = file.originalname.split('.').pop();

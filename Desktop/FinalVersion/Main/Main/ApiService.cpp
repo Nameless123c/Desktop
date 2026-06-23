@@ -3,6 +3,7 @@
 #include "nlohmann/json.hpp"
 #include <curl/curl.h>
 #include "ApiService.h"
+#include "CHomeChatDlg.h"
 
 size_t WriteCallBack(void* contents, size_t size, size_t nmemb, void* userp) {
 	size_t total_size = size * nmemb;
@@ -91,8 +92,9 @@ bool ApiService::DownloadFile(const std::string& url, const std::string& savePat
 	CURL* curl = curl_easy_init();
 	if (!curl) return false;
 
-	FILE* fp = fopen(savePath.c_str(), "wb");
-	if (!fp) {
+	FILE* fp = nullptr;
+	errno_t err = fopen_s(&fp, savePath.c_str(), "wb");
+	if (err != 0 || fp == nullptr) {
 		curl_easy_cleanup(curl);
 		return false;
 	}
@@ -106,13 +108,59 @@ bool ApiService::DownloadFile(const std::string& url, const std::string& savePat
 	curl_easy_setopt(curl, CURLOPT_URL, url.c_str());
 	curl_easy_setopt(curl, CURLOPT_HTTPHEADER, headers);
 	curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, WriteFileCallBack);
-	curl_easy_setopt(curl, CURLOPT_WRITEDATA, fp); 
+	curl_easy_setopt(curl, CURLOPT_WRITEDATA, fp);
 	curl_easy_setopt(curl, CURLOPT_SSL_VERIFYPEER, 0L);
 	curl_easy_setopt(curl, CURLOPT_TIMEOUT, 3600L);
 
 	CURLcode res = curl_easy_perform(curl);
 
-	fclose(fp); // Đóng file sau khi ghi xong
+	fclose(fp); // Đóng file sau khi xong
+	if (headers) curl_slist_free_all(headers);
+	curl_easy_cleanup(curl);
+
+	return (res == CURLE_OK);
+}
+
+bool ApiService::UpdateProfile(const std::string& url, const std::string& fullName, const std::string& path, const std::string& token) {
+	CURL* curl = curl_easy_init();
+	if (!curl) return false;
+
+	curl_mime* mime = curl_mime_init(curl);
+	curl_mimepart* part = NULL;
+
+	// 1. Thêm trường FullName (Text)
+	if (!fullName.empty()) {
+		part = curl_mime_addpart(mime);
+		curl_mime_name(part, "FullName");
+		curl_mime_data(part, fullName.c_str(), CURL_ZERO_TERMINATED);
+	}
+
+	// 2. Thêm trường Avatar (File)
+	// Server yêu cầu fieldname là 'avatar' (chữ thường)
+	if (!path.empty()) {
+		part = curl_mime_addpart(mime);
+		curl_mime_name(part, "avatar");
+		curl_mime_filedata(part, path.c_str());
+	}
+
+	// 3. Thiết lập Header
+	struct curl_slist* headers = NULL;
+	if (!token.empty()) {
+		std::string authHeader = "Authorization: Bearer " + token;
+		headers = curl_slist_append(headers, authHeader.c_str());
+	}
+
+	// 4. Cấu hình cURL
+	curl_easy_setopt(curl, CURLOPT_URL, url.c_str());
+	curl_easy_setopt(curl, CURLOPT_HTTPHEADER, headers);
+	curl_easy_setopt(curl, CURLOPT_MIMEPOST, mime);
+	curl_easy_setopt(curl, CURLOPT_SSL_VERIFYPEER, 0L);
+
+	// 5. Thực hiện request
+	CURLcode res = curl_easy_perform(curl);
+
+	// 6. Dọn dẹp
+	curl_mime_free(mime);
 	if (headers) curl_slist_free_all(headers);
 	curl_easy_cleanup(curl);
 

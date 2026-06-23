@@ -117,7 +117,12 @@ void CHomeChatDlg::GetFiendList()
                 f.friendId = item["FriendID"];
                 f.fullName = item["FullName"];
                 f.isOnline = item["isOnline"];
-                if (item.contains("Avatar")) f.avatar = item["Avatar"];
+
+                if (item.contains("Avatar")) {
+                    f.avatar = item["Avatar"];
+                    f.avatar = f.avatar.substr(1);
+                }
+
                 f.pAvatar = FileService::LoadImageFromFile(f.avatar);
                 theApp.m_vecFriend.push_back(f);
                 DatabaseService::SyncFriendsToDB(theApp.m_vecFriend);
@@ -136,7 +141,17 @@ void CHomeChatDlg::GetUserData()
     if (res != "") {
         nlohmann::json jsonRes = nlohmann::json::parse(res);
         if (jsonRes["status"] == 1) {
-            if (jsonRes["data"].contains("Avatar")) theApp.m_userData.avatar = jsonRes["data"]["Avatar"];
+            if (jsonRes["data"].contains("Avatar")) {
+                theApp.m_userData.avatar = jsonRes["data"]["Avatar"];
+                theApp.m_userData.avatar = theApp.m_userData.avatar.substr(1);
+
+                std::string fullUrl = "http://localhost:8888/api/images/" + theApp.m_userData.avatar;
+                std::string localSavePath = theApp.m_userData.avatar;
+                std::string token = theApp.m_userData.token;
+
+                bool ok = ApiService::DownloadFile(fullUrl, localSavePath, token);
+            }
+
             theApp.m_userData.pAvatar = FileService::LoadImageFromFile(theApp.m_userData.avatar);
 
             std::string sqlUpdate = "UPDATE Users SET avatar = ? WHERE userId = ?;";
