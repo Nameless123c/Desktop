@@ -55,24 +55,29 @@ class _HomechatScreen extends State<HomechatScreen> {
   }
 
   Future<void> _getUserData() async {
-    String url = "http://localhost:8888/api/user/info";
+    String url = "http://10.0.2.2:8888/api/user/info";
     String token = SessionManager.token!;
     String res = await ApiService.sendGetRequest(url, token: token);
     if (res == "") return;
     var jsonRes = jsonDecode(res);
     if (jsonRes["status"] == 1) {
       var data = jsonRes["data"];
+
+      // Xử lý làm sạch đường dẫn Avatar giống như bên friend list
+      String rawAvatar = data.containsKey("Avatar") ? data["Avatar"] : 'avatar/default.jpg';
+      String cleanAvatar = rawAvatar.startsWith('/') ? rawAvatar.substring(1) : rawAvatar;
+
       SessionManager.currentUser = User(
         username: data["Username"],
         fullName: data["FullName"],
-        avatar: data.containsKey("Avatar") ? data["Avatar"] : 'avatar/default.jpg',
+        avatar: cleanAvatar, // Sử dụng biến đã làm sạch
       );
     }
   }
 
   Future<void> _getFriendList() async {
     SessionManager.friendList.clear();
-    String url = "http://localhost:8888/api/message/list-friend";
+    String url = "http://10.0.2.2:8888/api/message/list-friend";
     String token = SessionManager.token!;
     String res = await ApiService.sendGetRequest(url, token: token);
     if (res == "") return;
@@ -80,11 +85,15 @@ class _HomechatScreen extends State<HomechatScreen> {
     if (jsonRes["status"] == 1) {
       List<dynamic> dataList = jsonRes["data"];
       for (var item in dataList) {
+        // Xử lý chuỗi avatar: Lấy giá trị, nếu bắt đầu bằng '/' thì xóa nó đi
+        String rawAvatar = item.containsKey("Avatar") ? item["Avatar"] : 'avatar/default.jpg';
+        String cleanAvatar = rawAvatar.startsWith('/') ? rawAvatar.substring(1) : rawAvatar;
+
         SessionManager.friendList.add(Friend(
           friendId: item["FriendID"],
           fullName: item["FullName"],
           isOnline: item["isOnline"],
-          avatar: item.containsKey("Avatar") ? item["Avatar"] : 'avatar/default.jpg',
+          avatar: cleanAvatar, // Lưu giá trị đã làm sạch vào model
         ));
       }
     }

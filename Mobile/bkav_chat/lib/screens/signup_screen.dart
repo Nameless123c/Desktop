@@ -47,7 +47,7 @@ class _SignupScreenState extends State<SignupScreen> {
       return;
     }
 
-    String url = "http://localhost:8888/api/auth/register";
+    String url = "http://10.0.2.2:8888/api/auth/register";
     Map<String, dynamic> data = {
       "FullName": fullName,
       "Username": username,

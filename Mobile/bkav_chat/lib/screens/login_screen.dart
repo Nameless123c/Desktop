@@ -43,7 +43,7 @@ class _LoginScreenState extends State<LoginScreen> {
       return;
     }
 
-    String url = "http://localhost:8888/api/auth/login";
+    String url = "http://10.0.2.2:8888/api/auth/login";
     Map<String, dynamic> data = {
       "Username": username,
       "Password": password,
